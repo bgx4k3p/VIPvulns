@@ -145,16 +145,23 @@ def get_cve_details(cveId, apiKey):
 def main():
 
     # VARs
+    step = 0
     year = '2022'
     nvd_api_key = ''
     report_summary = f'reports/vipvulns-summary_{year}.csv'
     report_detailed = f'reports/vipvulns-details_{year}.csv'
 
     # Retrieve all published CISA Alerts for the specified year and parse referenced CVEs
+    step += 1
+    print(f'[{step}] Scrape US-CERT alerts for {year}')
     data = scrape_cisa_alerts(year)
+    print(f'\t{len(data)} alerts published')
 
     # Convert to Dataframe
     df_summary = pd.DataFrame(data)
+
+    step += 1
+    print(f'[{step}] Analyze referenced CVEs')
 
     # Split CVEs on separate rows individually
     df_detailed = df_summary.explode('cve')
@@ -162,11 +169,14 @@ def main():
     # Process only unique CVEs to avoid duplicate API requests
     df_cve = df_detailed[['cve']]
     df_cve = df_cve.drop_duplicates(subset='cve', keep="first").reset_index(drop=True)
+    print(f'\tIdentified {df_cve.shape[0]} CVEs')
 
+    step += 1
+    print(f'[{step}] Retrieve additional CVE details from NVD')
     df_cve['cve'] = df_cve['cve'].fillna('')
     for i, row in df_cve.iterrows():
         if row['cve'] != '':
-            print(f'\tRetrieving info for {row["cve"]}')
+            print(f'\t{row["cve"]}')
             cve_info = get_cve_details(row['cve'], nvd_api_key)
 
             # Add new attributes to the CVE details
@@ -176,9 +186,12 @@ def main():
     # Merge CVE data with Detailed CISA report
     df_detailed = pd.merge(df_detailed, df_cve, how='left', left_on='cve', right_on='cve')
 
-    # Write reports
+    step += 1
+    print(f'[{step}] Generate reports')
     df_summary.to_csv(report_summary, index=False)
     df_detailed.to_csv(report_detailed, index=False)
+
+    print('Done!')
 
 
 if __name__ == "__main__":
